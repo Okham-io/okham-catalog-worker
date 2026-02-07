@@ -64,7 +64,7 @@ async function serveRegistry(env: Env, kind: string): Promise<Response> {
   });
 }
 
-async function serveLatestAlias(env: Env, kind: string, id: string, file: string): Promise<Response> {
+async function serveLatestAlias(baseUrl: URL, env: Env, kind: string, id: string, file: string): Promise<Response> {
   const latestKey = keyJoin("catalog", kind, id, "latest.json");
   const latestJson = await env.CATALOG_INDEX.get(latestKey);
   if (!latestJson) {
@@ -78,9 +78,10 @@ async function serveLatestAlias(env: Env, kind: string, id: string, file: string
   }
   if (!latest.version) return json({ error: "invalid_latest", key: latestKey }, { status: 500 });
 
+  // Preserve whatever host this worker is deployed on (okham.io, catalog.okham.io, pages.dev, etc.)
   const url = new URL(
     `/catalog/${encodeURIComponent(kind)}/${encodeURIComponent(id)}/${encodeURIComponent(latest.version)}/${file}`,
-    "https://okham.io",
+    baseUrl.origin,
   );
 
   // Redirect is better for caching; clients can follow.
@@ -136,6 +137,19 @@ export default {
     const url = new URL(req.url);
     const path = url.pathname;
 
+    // Avoid confusing 404 JSON on the human-facing route. This worker is an API.
+    if (path === "/catalog" || path === "/catalog/") {
+      // Canonical landing lives on the site; keep this as a redirect.
+      return new Response(null, {
+        status: 302,
+        headers: {
+          location: "https://okham.io/catalogs/",
+          "cache-control": "public, max-age=300",
+          ...CORS_HEADERS,
+        },
+      });
+    }
+
     if (path === "/catalog/_health") {
       return json({ ok: true, worker: env.OKHAM_CATALOG_WORKER, now: new Date().toISOString() });
     }
@@ -157,7 +171,7 @@ export default {
       const kind = decodeURIComponent(latestMatch[1]);
       const id = decodeURIComponent(latestMatch[2]);
       const file = latestMatch[3];
-      return serveLatestAlias(env, kind, id, file);
+      return serveLatestAlias(url, env, kind, id, file);
     }
 
     // /catalog/<kind>/<id>/<version>/<file>
