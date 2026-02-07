@@ -1,0 +1,27 @@
+name = "okham-catalog"
+main = "src/index.ts"
+compatibility_date = "2026-02-07"
+
+# Bindings (create these in Cloudflare dashboard or via wrangler and paste the ids here)
+
+# R2 bucket where versioned artifacts live (immutable per version)
+[[r2_buckets]]
+binding = "CATALOG_BUCKET"
+bucket_name = "okham-catalog"
+
+# KV namespace for fast registries + latest pointers
+[[kv_namespaces]]
+binding = "CATALOG_INDEX"
+# id = "<KV_NAMESPACE_ID>"
+
+# Optional: set a custom route once deployed (Cloudflare zone must be in same account)
+# routes = [
+#   { pattern = "okham.io/catalog/*", zone_name = "okham.io" }
+# ]
+
+[vars]
+# Used by /catalog/_health only.
+OKHAM_CATALOG_WORKER = "okham-catalog"
+
+# Ingest webhook (future). Keep disabled for now.
+INGEST_ENABLED = "0"
