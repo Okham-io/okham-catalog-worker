@@ -78,9 +78,11 @@ async function serveLatestAlias(baseUrl: URL, env: Env, kind: string, id: string
   }
   if (!latest.version) return json({ error: "invalid_latest", key: latestKey }, { status: 500 });
 
-  // Preserve whatever host this worker is deployed on (okham.io, catalog.okham.io, pages.dev, etc.)
+  // Canonical URL shape on the catalog subdomain is root-based:
+  //   https://catalog.okham.io/<kind>/<id>/<version>/<file>
+  // Keep host from the deployment.
   const url = new URL(
-    `/catalog/${encodeURIComponent(kind)}/${encodeURIComponent(id)}/${encodeURIComponent(latest.version)}/${file}`,
+    `/${encodeURIComponent(kind)}/${encodeURIComponent(id)}/${encodeURIComponent(latest.version)}/${file}`,
     baseUrl.origin,
   );
 
@@ -137,9 +139,13 @@ export default {
     const url = new URL(req.url);
     const path = url.pathname;
 
-    // Avoid confusing 404 JSON on the human-facing route. This worker is an API.
-    if (path === "/catalog" || path === "/catalog/") {
-      // Canonical landing lives on the site; keep this as a redirect.
+    // This worker is the catalog API. Canonical deployment is on catalog.okham.io at root.
+    // For backwards compatibility, also accept /catalog/* when routed under okham.io.
+    const isLegacyPrefix = path === "/catalog" || path === "/catalog/" || path.startsWith("/catalog/");
+    const apiPath = path.startsWith("/catalog/") ? path.slice("/catalog".length) : path; // keep leading '/'
+
+    // Human-facing entrypoints
+    if (path === "/" || path === "" || path === "/catalog" || path === "/catalog/") {
       return new Response(null, {
         status: 302,
         headers: {
@@ -150,23 +156,24 @@ export default {
       });
     }
 
-    if (path === "/catalog/_health") {
-      return json({ ok: true, worker: env.OKHAM_CATALOG_WORKER, now: new Date().toISOString() });
+    // Health / ingest (support both root-based and legacy-prefixed)
+    if (apiPath === "/_health") {
+      return json({ ok: true, worker: env.OKHAM_CATALOG_WORKER, now: new Date().toISOString(), legacy: isLegacyPrefix });
     }
 
-    if (path === "/catalog/_ingest/github" && req.method === "POST") {
+    if (apiPath === "/_ingest/github" && req.method === "POST") {
       return handleIngest(req, env);
     }
 
-    // /catalog/<kind>/registry.json
-    const registryMatch = path.match(/^\/catalog\/([^/]+)\/registry\.json$/);
+    // /<kind>/registry.json
+    const registryMatch = apiPath.match(/^\/([^/]+)\/registry\.json$/);
     if (registryMatch && req.method === "GET") {
       const kind = decodeURIComponent(registryMatch[1]);
       return serveRegistry(env, kind);
     }
 
-    // /catalog/<kind>/<id>/latest/<file>
-    const latestMatch = path.match(/^\/catalog\/([^/]+)\/([^/]+)\/latest\/(.+)$/);
+    // /<kind>/<id>/latest/<file>
+    const latestMatch = apiPath.match(/^\/([^/]+)\/([^/]+)\/latest\/(.+)$/);
     if (latestMatch && req.method === "GET") {
       const kind = decodeURIComponent(latestMatch[1]);
       const id = decodeURIComponent(latestMatch[2]);
@@ -174,8 +181,8 @@ export default {
       return serveLatestAlias(url, env, kind, id, file);
     }
 
-    // /catalog/<kind>/<id>/<version>/<file>
-    const artifactMatch = path.match(/^\/catalog\/([^/]+)\/([^/]+)\/([^/]+)\/(.+)$/);
+    // /<kind>/<id>/<version>/<file>
+    const artifactMatch = apiPath.match(/^\/([^/]+)\/([^/]+)\/([^/]+)\/(.+)$/);
     if (artifactMatch && req.method === "GET") {
       const kind = decodeURIComponent(artifactMatch[1]);
       const id = decodeURIComponent(artifactMatch[2]);
