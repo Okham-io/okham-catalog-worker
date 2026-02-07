@@ -1,4 +1,4 @@
-name = "okham-catalog"
+name = "okham-catalog-worker"
 main = "src/index.ts"
 compatibility_date = "2026-02-07"
 
