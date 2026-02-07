@@ -145,7 +145,24 @@ export default {
     const apiPath = path.startsWith("/catalog/") ? path.slice("/catalog".length) : path; // keep leading '/'
 
     // Human-facing entrypoints
-    if (path === "/" || path === "" || path === "/catalog" || path === "/catalog/") {
+    if (path === "/" || path === "") {
+      return text(
+        [
+          "OKHAM Catalog API (canonical host: catalog.okham.io)",
+          "",
+          "Endpoints:",
+          "- GET /_health",
+          "- GET /<kind>/registry.json",
+          "- GET /<kind>/<id>/latest/<file>",
+          "- GET /<kind>/<id>/<version>/<file>",
+          "",
+          "Human landing: https://okham.io/catalogs/",
+        ].join("\n"),
+        { status: 200, headers: { "cache-control": "public, max-age=300" } },
+      );
+    }
+
+    if (path === "/catalog" || path === "/catalog/") {
       return new Response(null, {
         status: 302,
         headers: {
