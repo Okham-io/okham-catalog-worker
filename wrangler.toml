@@ -12,7 +12,7 @@ bucket_name = "okham-catalog"
 # KV namespace for fast registries + latest pointers
 [[kv_namespaces]]
 binding = "CATALOG_INDEX"
-# id = "<KV_NAMESPACE_ID>"
+id = "d6a00e47b86d4209a649a2018db40e05"
 
 # Optional: set a custom route once deployed (Cloudflare zone must be in same account)
 # routes = [
